@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Juegos del amor</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        background: linear-gradient(#ffe6f0, #fff);
+        font-family: "Comic Sans MS", "Caveat", cursive;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: start;
+        min-height: 100vh;
+      }
+
+      h1 {
+        color: #ff69b4;
+        margin: 20px 0 10px;
+        font-size: 36px;
+        text-shadow: 1px 1px 2px #fff;
+      }
+
+      canvas {
+        background: #fff0f5;
+        border: 4px solid #ff80ab;
+        border-radius: 12px;
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+        max-width: 100%;
+        height: auto;
+      }
+
+      #message,
+      #startMessage {
+        text-align: center;
+        font-size: 20px;
+        margin: 10px 20px;
+        color: #d63384;
+        min-height: 30px;
+      }
+
+      #touchControls {
+        display: none;
+        margin-top: 20px;
+      }
+
+      .touch-btn {
+        font-size: 20px;
+        padding: 10px 20px;
+        margin: 0 10px;
+        background-color: #ff69b4;
+        color: white;
+        border: none;
+        border-radius: 10px;
+        box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.2);
+        cursor: pointer;
+      }
+
+      @media (max-width: 768px) {
+        #touchControls {
+          display: flex;
+          justify-content: center;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Juegos del amor</h1>
+    <canvas id="pong" width="700" height="400"></canvas>
+    <div id="message"></div>
+    <div id="startMessage">Presiona ENTER o toca aquí para comenzar</div>
+
+    <div id="touchControls">
+      <button class="touch-btn" id="btnUp">🔼 Subir</button>
+      <button class="touch-btn" id="btnDown">🔽 Bajar</button>
+    </div>
+
+    <script>
+      const canvas = document.getElementById("pong");
+      const ctx = canvas.getContext("2d");
+      const messageDiv = document.getElementById("message");
+      const startMessage = document.getElementById("startMessage");
+      const btnUp = document.getElementById("btnUp");
+      const btnDown = document.getElementById("btnDown");
+
+      const user = {
+        x: 10,
+        y: canvas.height / 2 - 50,
+        width: 10,
+        height: 100,
+        color: "#ff69b4",
+        score: 0,
+      };
+      const ai = {
+        x: canvas.width - 20,
+        y: canvas.height / 2 - 50,
+        width: 10,
+        height: 100,
+        color: "#999",
+        score: 0,
+      };
+      const ball = {
+        x: canvas.width / 2,
+        y: canvas.height / 2,
+        radius: 10,
+        speed: 5,
+        velocityX: 5,
+        velocityY: 5,
+        color: "#d63384",
+      };
+
+      let isPaused = true;
+      let isGameOver = false;
+      let lastScoredTime = 0;
+      let robotCommentShown = false;
+
+      function drawRect(x, y, w, h, color) {
+        ctx.fillStyle = color;
+        ctx.fillRect(x, y, w, h);
+      }
+
+      function drawCircle(x, y, r, color) {
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.arc(x, y, r, 0, Math.PI * 2);
+        ctx.closePath();
+        ctx.fill();
+      }
+
+      function drawText(text, x, y, color) {
+        ctx.fillStyle = color;
+        ctx.font = "20px Comic Sans MS";
+        ctx.fillText(text, x, y);
+      }
+
+      function resetBall() {
+        ball.x = canvas.width / 2;
+        ball.y = canvas.height / 2;
+        ball.velocityX = -ball.velocityX;
+        ball.speed = 5;
+      }
+
+      function draw() {
+        drawRect(0, 0, canvas.width, canvas.height, "#fff0f5");
+        drawText(`Princesa: ${user.score}`, 50, 30, "#ff69b4");
+        drawText(`Mi niño: ${ai.score}`, canvas.width - 150, 30, "#555");
+        drawRect(user.x, user.y, user.width, user.height, user.color);
+        drawRect(ai.x, ai.y, ai.width, ai.height, ai.color);
+        drawCircle(ball.x, ball.y, ball.radius, ball.color);
+      }
+
+      function update() {
+        if (isPaused || isGameOver) return;
+
+        ball.x += ball.velocityX;
+        ball.y += ball.velocityY;
+
+        ai.y += (ball.y - (ai.y + ai.height / 2)) * 0.05;
+
+        if (ball.y + ball.radius > canvas.height || ball.y - ball.radius < 0) {
+          ball.velocityY = -ball.velocityY;
+        }
+
+        let player = ball.x < canvas.width / 2 ? user : ai;
+
+        if (collision(ball, player)) {
+          let collidePoint = ball.y - (player.y + player.height / 2);
+          collidePoint = collidePoint / (player.height / 2);
+          let angleRad = (collidePoint * Math.PI) / 4;
+          let direction = ball.x < canvas.width / 2 ? 1 : -1;
+          ball.velocityX = direction * ball.speed * Math.cos(angleRad);
+          ball.velocityY = ball.speed * Math.sin(angleRad);
+          ball.speed += 0.5;
+        }
+
+        if (ball.x - ball.radius < 0) {
+          ai.score++;
+          resetBall();
+          lastScoredTime = Date.now();
+          robotCommentShown = false;
+          checkWin();
+          if (!isGameOver) {
+            showMessage(false);
+            pauseGame();
+          }
+        } else if (ball.x + ball.radius > canvas.width) {
+          user.score++;
+          resetBall();
+          lastScoredTime = Date.now();
+          robotCommentShown = false;
+          checkWin();
+          if (!isGameOver) {
+            showMessage(true);
+            pauseGame();
+          }
+        }
+
+        const diff = ai.score - user.score;
+        const now = Date.now();
+        if (
+          !isPaused &&
+          !isGameOver &&
+          now - lastScoredTime > 2000 &&
+          !robotCommentShown
+        ) {
+          robotCommentShown = true;
+          if (diff === 2) {
+            messageDiv.textContent = "Uy, ¿te estás dejando, tontita?";
+          } else if (diff === 1) {
+            messageDiv.textContent = "No me dejes ganar, viejita 😜";
+          } else if (diff <= -1) {
+            messageDiv.textContent = randomItem([
+              "Nooo, ¿cómo va ganando mi princesa? 😳",
+              "¡No vale! Tú estás usando truco 💔",
+            ]);
+          }
+        }
+      }
+
+      function collision(b, p) {
+        return (
+          b.x < p.x + p.width &&
+          b.x + b.radius > p.x &&
+          b.y < p.y + p.height &&
+          b.y + b.radius > p.y
+        );
+      }
+
+      function showMessage(userScored) {
+        lastScoredTime = Date.now();
+        robotCommentShown = false;
+        const goodMsgs = [
+          "¡Bien hecho mi amor!",
+          "¡Bravo princesa!",
+          "¡Así se hace, mi reina!",
+        ];
+        const badMsgs = [
+          "Ay boba… era fácil.",
+          "Vamos mi viejita, mueve esa raqueta.",
+          "Te estoy ganando tontita 😜",
+        ];
+        messageDiv.textContent = userScored
+          ? randomItem(goodMsgs)
+          : randomItem(badMsgs);
+      }
+
+      function pauseGame() {
+        isPaused = true;
+        startMessage.textContent = "Presiona ENTER o toca aquí para continuar";
+      }
+
+      function resumeGame() {
+        isPaused = false;
+        messageDiv.textContent = "";
+        startMessage.textContent = "";
+      }
+
+      function checkWin() {
+        if (user.score >= 3) {
+          isGameOver = true;
+          messageDiv.textContent =
+            "Felicidades mi amor, sabía que me ganarías, pero no te lo dejé fácil eh, jaja. Te quiero mucho ❤.";
+          startMessage.textContent =
+            "Presiona ENTER o toca aquí para volver a jugar";
+        } else if (ai.score >= 3) {
+          isGameOver = true;
+          messageDiv.textContent =
+            "Uy… perdiste tontita 😜, ¡pero jugaste bien!";
+          startMessage.textContent =
+            "Presiona ENTER o toca aquí para volver a jugar";
+        }
+      }
+
+      function randomItem(arr) {
+        return arr[Math.floor(Math.random() * arr.length)];
+      }
+
+      function restartGame() {
+        user.score = 0;
+        ai.score = 0;
+        isPaused = true;
+        isGameOver = false;
+        resetBall();
+        messageDiv.textContent = "";
+        startMessage.textContent = "Presiona ENTER o toca aquí para comenzar";
+      }
+
+      function game() {
+        update();
+        draw();
+      }
+
+      setInterval(game, 1000 / 60);
+
+      document.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") {
+          if (isGameOver) restartGame();
+          else if (isPaused) resumeGame();
+        }
+
+        if (!isPaused && !isGameOver) {
+          if (e.key === "w" || e.key === "W") user.y -= 25;
+          if (e.key === "s" || e.key === "S") user.y += 25;
+        }
+      });
+
+      btnUp.addEventListener("touchstart", () => {
+        if (!isPaused && !isGameOver) user.y -= 25;
+      });
+      btnDown.addEventListener("touchstart", () => {
+        if (!isPaused && !isGameOver) user.y += 25;
+      });
+      startMessage.addEventListener("touchstart", () => {
+        if (isGameOver) restartGame();
+        else if (isPaused) resumeGame();
+      });
+
+      startMessage.textContent = "Presiona ENTER o toca aquí para comenzar";
+    </script>
+  </body>
+</html>
