@@ -2,7 +2,10 @@
 <html lang="es">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+    />
     <title>Juegos del amor</title>
     <style>
       html,
@@ -16,6 +19,7 @@
         align-items: center;
         justify-content: start;
         min-height: 100vh;
+        touch-action: manipulation;
       }
 
       h1 {
@@ -58,6 +62,7 @@
         border-radius: 10px;
         box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.2);
         cursor: pointer;
+        user-select: none;
       }
 
       @media (max-width: 768px) {
@@ -314,9 +319,17 @@
       btnDown.addEventListener("touchstart", () => {
         if (!isPaused && !isGameOver) user.y += 25;
       });
+
       startMessage.addEventListener("touchstart", () => {
         if (isGameOver) restartGame();
         else if (isPaused) resumeGame();
+      });
+
+      // 👇 Evita el zoom por doble tap en móviles
+      [btnUp, btnDown].forEach((btn) => {
+        btn.addEventListener("touchstart", (e) => e.preventDefault(), {
+          passive: false,
+        });
       });
 
       startMessage.textContent = "Presiona ENTER o toca aquí para comenzar";
